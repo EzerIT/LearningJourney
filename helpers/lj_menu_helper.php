@@ -16,6 +16,10 @@ function lj_menu_add(&$head, &$content) {
     }
     
     $content[$ix][] = anchor(site_url('/lj/LJ_gradebook_teacher'), $CI->lang->line('gradebook'));
+
+    if ($CI->Mod_users->is_teacher())
+        $content[$ix][] = anchor(site_url('/lj/LJ_graph_teacher'), 'Graphs');
+    
     //$content[$ix][] = anchor(site_url('lj/LJ_international_ranking'), $CI->lang->line('international_ranking'));
 
     /*$content[$ix][] = anchor(site_url('logbook'), $this->lang->line('logbook'));
