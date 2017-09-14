@@ -4,7 +4,8 @@
 class Ctrl_LJ_graph_teacher extends MY_Controller {
     public function __construct() {
         parent::__construct();
-        $this->load->helper('lj_date_helper');
+
+        $this->load->library('Lj_timeperiod');
     }
 
     public function index() {
@@ -66,15 +67,10 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
 //			if ($classid<=0 || $class->ownerid!=$this->mod_users->my_id())
 				throw new DataException($this->lang->line('illegal_class_id'));
             
-            $this->form_validation->set_rules('start_date', 'Start date', 'trim|valid_date_check');
-            $this->form_validation->set_rules('end_date', 'End date', 'trim|valid_date_check');
+            $this->lj_timeperiod->set_validation_rules();
 
 			if ($this->form_validation->run()) {
-                $period_start = decode_start_date($this->input->get('start_date'));
-                $period_end = decode_end_date($this->input->get('end_date')) -1;  // -1 to turn exclusive time into inclusive
-
-                // If period is longer than MAX_PERIOD, adjust the end date.
-                $period_end = min($period_end, $period_start + MAX_PERIOD -1);
+                $this->lj_timeperiod->ok_dates();
 
                 $status = 1; // 1 = OK
                 
@@ -88,13 +84,15 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
 
                 $templates = $this->mod_statistics->get_templates_for_class_and_students($classid,$student_ids);
                 if (!empty($templates))
-                    $durations = $this->mod_statistics->get_quizzes_duration($templates, $period_start, $period_end);
+                    $durations = $this->mod_statistics->get_quizzes_duration($templates,
+                                                                             $this->lj_timeperiod->start_timestamp(),
+                                                                             $this->lj_timeperiod->end_timestamp());
                 else
                     $durations = array();
 
                 // How many weeks does the time cover?
-                $minweek = time_to_week($period_start);
-                $maxweek = time_to_week($period_end);
+                $minweek = $this->lj_timeperiod->start_week();
+                $maxweek = $this->lj_timeperiod->end_week();
 
                 // What students actually have results?
                 $real_students = array(); // Will be used as a set
@@ -116,7 +114,7 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
 
                 foreach ($durations as $d) {
                     $hours = $d->duration / 3600;
-                    $w = time_to_week((int)$d->start);
+                    $w = $this->lj_timeperiod->time_to_week((int)$d->start);
                     $dur[$w][$d->userid] += $hours;
                     $total[$w] += $hours;
                 }
@@ -127,9 +125,7 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
                         $real_students[$st->userid] = $st->name;
 			}
             else {
-                $period_end = ((int)(time() / (24*3600)) + 1) * 24*3600;  // Midnight tonight
-                $period_start = $period_end - MAX_PERIOD;
-                --$period_end;  // Turn exclusive time into inclusive
+                $this->lj_timeperiod->default_dates();
                 
                 $real_students = null;
                 $dur = null;
@@ -153,8 +149,8 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
                                                                                   'classid' => $classid,
                                                                                   'classname' => $class->classname,
                                                                                   'students' => $real_students,
-                                                                                  'start_date' => timestamp_to_date($period_start),
-                                                                                  'end_date' => timestamp_to_date($period_end),
+                                                                                  'start_date' => $this->lj_timeperiod->start_string(),
+                                                                                  'end_date' => $this->lj_timeperiod->end_string(),
                                                                                   'dur' => $dur,
                                                                                   'total' => $total), true);
 
@@ -195,16 +191,11 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
 
             $exercise_list = $this->mod_statistics->get_pathnames_for_class($classid);
 
-            $this->form_validation->set_rules('start_date', 'Start date', 'trim|valid_date_check');
-            $this->form_validation->set_rules('end_date', 'End date', 'trim|valid_date_check');
+            $this->lj_timeperiod->set_validation_rules();
             $this->form_validation->set_rules('exercise', '', 'callback_always_true');  // Dummy rule. At least one rule is required
 
 			if ($this->form_validation->run()) {
-                $period_start = decode_start_date($this->input->get('start_date'));
-                $period_end = decode_end_date($this->input->get('end_date')) -1;  // -1 to turn exclusive time into inclusive
-
-                // If period is longer than MAX_PERIOD, adjust the end date.
-                $period_end = min($period_end, $period_start + MAX_PERIOD -1);
+                $this->lj_timeperiod->ok_dates();
 
                 $ex = $this->input->get('exercise');
                 if (empty($ex)) {
@@ -221,7 +212,10 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
                     $real_students = array(); // Will be used as a set
 
                     foreach ($users_and_templs as $uid => $templs) {
-                        $res = $this->mod_statistics->get_score_by_date_user_templ($uid,$templs,$period_start,$period_end);
+                        $res = $this->mod_statistics->get_score_by_date_user_templ($uid,
+                                                                                   $templs,
+                                                                                   $this->lj_timeperiod->start_timestamp(),
+                                                                                   $this->lj_timeperiod->end_timestamp());
                         if (empty($res))
                             continue;
                         $resall[] = $res;
@@ -238,9 +232,7 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
                 }
             }
             else {
-                $period_end = ((int)(time() / (24*3600)) + 1) * 24*3600;  // Midnight tonight
-                $period_start = $period_end - MAX_PERIOD;
-                --$period_end;  // Turn exclusive time into inclusive
+                $this->lj_timeperiod->default_dates();
 
                 $ex = '';
                 $status = 2; // 2=Initial display
@@ -249,8 +241,8 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
             }
 
             // How many weeks does the time cover?
-            $minweek = time_to_week($period_start);
-            $maxweek = time_to_week($period_end);
+            $minweek = $this->lj_timeperiod->start_week();
+            $maxweek = $this->lj_timeperiod->end_week();
 
             
             // VIEW:
@@ -271,10 +263,10 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
                                                                                    'resall' => $resall,
                                                                                    'status' => $status,
                                                                                    'quiz' => $ex,
-                                                                                   'start_date' => timestamp_to_date($period_start),
-                                                                                   'end_date' => timestamp_to_date($period_end),
-                                                                                   'minweek' => (int)$minweek,
-                                                                                   'maxweek' => (int)$maxweek,
+                                                                                   'start_date' => $this->lj_timeperiod->start_string(),
+                                                                                   'end_date' => $this->lj_timeperiod->end_string(),
+                                                                                   'minweek' => $this->lj_timeperiod->start_week(),
+                                                                                   'maxweek' => $this->lj_timeperiod->end_week(),
                                                                                    'exercise_list' => $exercise_list), true);
 
             $this->load->view('view_main_page', array('left_title' => 'Select a Period',
