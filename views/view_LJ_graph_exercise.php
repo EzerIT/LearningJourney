@@ -17,9 +17,9 @@
         return date('W',$unixtime);
     }
 ?>
-   <h1>Statistics for class &ldquo;<?= htmlspecialchars($classname) ?>&rdquo;</h1>
+   <h1>Statistics for exercise &ldquo;<?= htmlspecialchars($quiz) ?>&rdquo;</h1>
 
-    <?= form_open("lj/LJ_graph_teacher/view_exercises?classid=$classid") ?>
+  <?= form_open("/lj/LJ_graph_student/view_quiz") ?>
     <p>Specify date period (in the UTC time zone):</p>
   <table>
     <tr>
@@ -30,19 +30,9 @@
     </tr>
   </table>
 
-  <p>&nbsp;</p>
-  <div>
-    <span style="font-weight:bold">Exercise:</span>
-    <select name="exercise">
-      <option value="" <?= set_select('exercise', '', true) ?>></option>
-      <?php foreach($exercise_list as $ex): ?>
-        <?php $ex2 = htmlspecialchars($ex); ?>
-        <option value="<?= $ex2 ?>" <?= set_select('exercise', $ex) ?>><?= $ex2 ?></option>
-      <?php endforeach; ?>
-    </select>
-  </div>
-
-
+  <input type="hidden" name="templ" value="<?= $quiz ?>">
+  <input type="hidden" name="userid" value="<?= $userid ?>">
+            
   <p><input class="btn btn-primary" style="margin-top:10px;" type="submit" name="submit" value="<?= $this->lang->line('OK_button') ?>"></p>
 </form>
 
@@ -92,7 +82,6 @@
 </script>
 
 <?php if ($status!=2): ?>
-  <h2>Statistics for exercise &ldquo;<?= htmlspecialchars($quiz) ?>&rdquo;</h2>
 
   <?php if ($status==0): ?>
 
@@ -101,36 +90,21 @@
   <?php else: ?>
 
     <?php
-      foreach ($resall as $r1) {
-          $res1 = array();
-          $res1spf = array();
-          foreach ($r1 as $r2) {
-              $res1[]    = "['$r2->st',$r2->pct,null,'Date: $r2->st<br>Questions: $r2->cnt']";
-              $roundpct = round($r2->pct);
-              $res1spf[] = "['$r2->st',$r2->featpermin,null,'Date: $r2->st<br>Correct: $roundpct%']";
-          }
-          $res2[]    = "[" . implode(",",$res1) . "]";
-          $res2spf[] = "[" . implode(",",$res1spf) . "]";
+      $res = array();
+      $resspf = array();
+      foreach ($resall as $r) {
+          $res[]    = "['$r->st',$r->pct,null,'Date: $r->st<br>Questions: $r->cnt']";
+          $roundpct = round($r->pct);
+          $resspf[] = "['$r->st',$r->featpermin,null,'Date: $r->st<br>Correct: $roundpct%']";
       }
 
-      $resx    = "[" . implode(",", $res2) . "]";
-      $resxspf = "[" . implode(",", $res2spf) . "]";
-
-      $student_captions = array();
-      $ix = 0;
-      foreach ($students as $id => $name) {
-          $student_captions[$ix] = "'<input type=\"checkbox\" checked name=\"users\" value=\"$ix\">" . addslashes($name) . "'";
-          ++$ix;
-      }
+      $resx    = "[[" . implode(",", $res) . "]]";
+      $resxspf = "[[" . implode(",", $resspf) . "]]";
     ?>
 
     <canvas style="background:#f8f8f8; display:inline-block; vertical-align:top;" id="cvs" width="800" height="500">
       [No canvas support]
     </canvas>
-    <div style="display:inline-block; vertical-align:top;">
-      <div id="mykey"></div>
-      <div id="allkey"><input type="checkbox" style="margin-left:20px" checked name="selectall" value="">All</div>
-    </div>
 
     <canvas style="background:#f8f8f8; display:inline-block; vertical-align:top;" id="cvsspf" width="800" height="500">
       [No canvas support]
@@ -159,12 +133,11 @@
       }
 
       $(function() {
-          <?php if (count($students)<2): ?>
-            $('#allkey').hide();
-          <?php endif; ?>
                 
           var dataorig = <?= $resx ?>;
           var dataorigspf = <?= $resxspf ?>;
+
+
           var scatterdata = {
               id: 'cvs',
               data: null,
@@ -208,10 +181,6 @@
           scatter = new RGraph.Scatter(scatterdata).draw();
           scatterspf = new RGraph.Scatter(scatterdataspf).on('firstdraw', adaptScale).draw();
 
-          RGraph.HTML.Key('mykey', {
-              'colors': scatter.Get('colors'),
-              'labels': [<?= implode(",", $student_captions) ?> ]
-              });
 
 
           var users_elem = $('input[name="users"]');

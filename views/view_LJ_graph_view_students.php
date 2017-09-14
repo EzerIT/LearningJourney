@@ -18,7 +18,7 @@
     }
 ?>
 
-   <h1>Statistics for class &ldquo;<?= htmlspecialchars($classname) ?>&rdquo;</h2>
+   <h1>Statistics for class &ldquo;<?= htmlspecialchars($classname) ?>&rdquo;</h1>
     <?= form_open("lj/LJ_graph_teacher/view_students?classid=$classid") ?>
     <p>Specify date period (in the UTC time zone):</p>
   <table>
@@ -134,7 +134,24 @@
                     config.data[p].push(data[p][s]);
         }
     }
-   
+
+    function adaptScale(obj, e) {
+        // Change number of decimals on y axis depending on max value
+        if (obj.scale2.max < 0.05)
+            obj.set('scaleDecimals', 3);
+        else if (obj.scale2.max < 0.5)
+            obj.set('scaleDecimals', 2);
+        else if (obj.scale2.max < 5)
+            obj.set('scaleDecimals', 1);
+        else
+            obj.set('scaleDecimals', 0);
+
+        this.firstDraw=false; // Prevent firstdraw event from firing again. (Probably bug in RGraph.)
+        RGraph.redraw();
+    }
+
+
+
     $(function() {
         var bar1 = new RGraph.Bar({
             id: 'totalcanvas',
@@ -152,7 +169,7 @@
                 titleXaxisY: 490,
                 textAccessible: true
             }
-        }).draw();
+        }).on('firstdraw', adaptScale).draw();
 
     
         var bar2colors = ['#f00','#0f0','#00f','#0ff','#ff0','#f0f','#000',
@@ -184,7 +201,7 @@
         };
 
         set_config(bar2config,bar2on,bar2data,bar2colors);
-        var bar2  = new RGraph.Bar(bar2config).draw();
+        var bar2  = new RGraph.Bar(bar2config).on('firstdraw', adaptScale).draw();
 
         RGraph.HTML.Key('mykey', {
             'colors': bar2.Get('colors'),
@@ -239,7 +256,7 @@
             
             set_config(bar2config,bar2on,bar2data,bar2colors);
             RGraph.reset(studentscanvas);
-            bar2  = new RGraph.Bar(bar2config).draw();
+            bar2  = new RGraph.Bar(bar2config).on('firstdraw', adaptScale).draw();
         }
         
         function allchange(e) {
