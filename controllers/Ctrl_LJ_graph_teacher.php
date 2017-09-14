@@ -2,31 +2,18 @@
 
 
 class Ctrl_LJ_graph_teacher extends MY_Controller {
-    const MAX_PERIOD = 26*7*24*3600;  // 26 weeks
+    public function __construct() {
+        parent::__construct();
+        $this->load->helper('lj_date_helper');
+    }
 
-    
     public function index() {
         $this->select_class();
 	}
 
-    public function valid_date_check($date) {
-        try {
-            new DateTime($date,new DateTimeZone('UTC'));
-            return true;
-        }
-        catch (Exception $e) {
-            return false;
-        }
-    }
-
-    public function decode_start_date($date) {
-        // Set time to 00:00:00
-        return date_create($date . ' 00:00:00',new DateTimeZone('UTC'))->getTimestamp();
-    }
-
-    public function decode_end_date($date) {
-        // Set time to 23:59:59 and add one second
-        return date_create($date . ' 23:59:59',new DateTimeZone('UTC'))->getTimestamp() + 1;
+    // Dummy validation function
+    public function always_true($field) {
+        return true;
     }
 
     public function select_class() {
@@ -57,14 +44,6 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
         }
     }
 
-    // Returns number of weeks since Monday 1970-01-05
-    private function time_to_week(integer $time) {
-        // UNIX time starts on a Thursday. So move epoch to Monday 1970-01-05
-        $monday_offset = 4*24*3600;
-        $seconds_per_week = 7*24*3600;
-        return floor(($time-$monday_offset) / $seconds_per_week);
-    }
-    
     public function view_students() {
     	$this->load->model('mod_users');
     	$this->load->model('mod_classes');
@@ -76,79 +55,88 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
 
             $this->db->set_dbprefix('bol_');
 
-            $classid = isset($_GET['classid']) ? (int)$_GET['classid'] : 0;
+            $this->load->helper('form');
+            $this->load->library('form_validation');
+
+            $this->form_validation->set_data($_GET);
+
+            $classid = (int)$this->input->get('classid');
             $class = $this->mod_classes->get_class_by_id($classid);
 			if ($classid<=0 || ($class->ownerid!=$this->mod_users->my_id() && $this->mod_users->my_id()!=25)) // TODO remove 25
 //			if ($classid<=0 || $class->ownerid!=$this->mod_users->my_id())
 				throw new DataException($this->lang->line('illegal_class_id'));
+            
+            $this->form_validation->set_rules('start_date', 'Start date', 'trim|valid_date_check');
+            $this->form_validation->set_rules('end_date', 'End date', 'trim|valid_date_check');
 
-            $students = $this->mod_userclass->get_named_users_in_class($classid);
-            if (empty($students))
-                throw new DataException('No students in class');
-
-            $student_ids = array();
-            foreach ($students as $st)
-                $student_ids[] = (int)$st->userid;
-
-            $this->load->helper('form');
-            $this->load->library('form_validation');
-
-            $this->form_validation->set_rules('start_date', 'Start date', 'trim|callback_valid_date_check');
-            $this->form_validation->set_rules('end_date', 'End date', 'trim|callback_valid_date_check');
-
- 
 			if ($this->form_validation->run()) {
-                $period_start = $this->decode_start_date($this->input->post('start_date'));
-                $period_end = $this->decode_end_date($this->input->post('end_date'));
+                $period_start = decode_start_date($this->input->get('start_date'));
+                $period_end = decode_end_date($this->input->get('end_date')) -1;  // -1 to turn exclusive time into inclusive
 
-                // If period is more than MAX_PERIOD, this is faked POST data. Adjust the end date.
-                $period_end = min($period_end, $period_start + self::MAX_PERIOD);
+                // If period is longer than MAX_PERIOD, adjust the end date.
+                $period_end = min($period_end, $period_start + MAX_PERIOD -1);
+
+                $status = 1; // 1 = OK
+                
+                $students = $this->mod_userclass->get_named_users_in_class($classid);
+                if (empty($students))
+                    throw new DataException('No students in class');
+
+                $student_ids = array();
+                foreach ($students as $st)
+                    $student_ids[] = (int)$st->userid;
+
+                $templates = $this->mod_statistics->get_templates_for_class_and_students($classid,$student_ids);
+                if (!empty($templates))
+                    $durations = $this->mod_statistics->get_quizzes_duration($templates, $period_start, $period_end);
+                else
+                    $durations = array();
+
+                // How many weeks does the time cover?
+                $minweek = time_to_week($period_start);
+                $maxweek = time_to_week($period_end);
+
+                // What students actually have results?
+                $real_students = array(); // Will be used as a set
+                foreach ($durations as $d)
+                    $real_students[$d->userid] = true;
+                ksort($real_students);
+                $number_students = count($real_students);
+            
+                // $dur[23][55] will be the duration for user 55 in week 23
+                // $total[23]  will be the total duration for all users in week 23
+                $dur = array();
+                $total = array();
+                for ($w=$minweek; $w<=$maxweek; ++$w) {
+                    $dur[$w] = array();
+                    $total[$w] = 0;
+                    foreach ($real_students as $st => $ignore)
+                        $dur[$w][$st] = 0;
+                }
+
+                foreach ($durations as $d) {
+                    $hours = $d->duration / 3600;
+                    $w = time_to_week((int)$d->start);
+                    $dur[$w][$d->userid] += $hours;
+                    $total[$w] += $hours;
+                }
+
+                // Get student names
+                foreach ($students as $st)
+                    if (isset($real_students[$st->userid]))
+                        $real_students[$st->userid] = $st->name;
 			}
             else {
                 $period_end = ((int)(time() / (24*3600)) + 1) * 24*3600;  // Midnight tonight
-                //$period_end = 1483138800; // 31.12.2016
-                $period_start = $period_end - self::MAX_PERIOD;
+                $period_start = $period_end - MAX_PERIOD;
+                --$period_end;  // Turn exclusive time into inclusive
+                
+                $real_students = null;
+                $dur = null;
+                $total = null;
+                
+                $status = 2; // 2 = Bad
             }
-
-            $templates = $this->mod_statistics->get_templates_for_class_and_students($classid,$student_ids);
-            if (!empty($templates))
-                $durations = $this->mod_statistics->get_quizzes_duration($templates, $period_start, $period_end);
-            else
-                $durations = array();
-
-            // How many weeks does the time cover?
-            $minweek = $this->time_to_week($period_start);
-            $maxweek = $this->time_to_week($period_end-1);
-
-            // What students actually have results?
-            $real_students = array(); // Will be used as a set
-            foreach ($durations as $d)
-                $real_students[$d->userid] = true;
-            ksort($real_students);
-            $number_students = count($real_students);
-            
-            // $dur[23][55] will be the duration for user 55 in week 23
-            // $total[23]  will be the total duration for all users in week 23
-            $dur = array();
-            $total = array();
-            for ($w=$minweek; $w<=$maxweek; ++$w) {
-                $dur[$w] = array();
-                $total[$w] = 0;
-                foreach ($real_students as $st => $ignore)
-                    $dur[$w][$st] = 0;
-            }
-
-            foreach ($durations as $d) {
-                $hours = $d->duration / 3600;
-                $w = $this->time_to_week((int)$d->start);
-                $dur[$w][$d->userid] += $hours;
-                $total[$w] += $hours;
-            }
-
-            // Get student names
-            foreach ($students as $st)
-                if (isset($real_students[$st->userid]))
-                    $real_students[$st->userid] = $st->name;
 
             // VIEW:
             $this->load->view('view_top1', array('title' => 'Student Graphs',
@@ -156,15 +144,17 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
                                                                     'RGraph/libraries/RGraph.bar.js',
                                                                     'RGraph/libraries/RGraph.common.dynamic.js',
                                                                     'RGraph/libraries/RGraph.common.tooltips.js',
-                                                                    'RGraph/libraries/RGraph.common.key.js')));
+                                                                    'RGraph/libraries/RGraph.common.key.js',
+                                                                    'myapp/third_party/lj/js/datepicker_period.js')));
             $this->load->view('view_top2');
             $this->load->view('view_menu_bar', array('langselect' => true));
-            
-            $center_text = $this->load->view('view_LJ_graph_view_students', array('classid' => $classid,
+
+            $center_text = $this->load->view('view_LJ_graph_view_students', array('status' => $status,
+                                                                                  'classid' => $classid,
                                                                                   'classname' => $class->classname,
                                                                                   'students' => $real_students,
-                                                                                  'start_date' => date('Y-m-d',$period_start),
-                                                                                  'end_date' => date('Y-m-d',$period_end),
+                                                                                  'start_date' => timestamp_to_date($period_start),
+                                                                                  'end_date' => timestamp_to_date($period_end),
                                                                                   'dur' => $dur,
                                                                                   'total' => $total), true);
 
@@ -191,7 +181,13 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
 
             $this->db->set_dbprefix('bol_');
 
-            $classid = isset($_GET['classid']) ? (int)$_GET['classid'] : 0;
+
+            $this->load->helper('form');
+            $this->load->library('form_validation');
+
+            $this->form_validation->set_data($_GET);
+
+            $classid = (int)$this->input->get('classid');
             $class = $this->mod_classes->get_class_by_id($classid);
 			if ($classid<=0 || ($class->ownerid!=$this->mod_users->my_id() && $this->mod_users->my_id()!=25)) // TODO remove 25
 //			if ($classid<=0 || $class->ownerid!=$this->mod_users->my_id())
@@ -199,58 +195,62 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
 
             $exercise_list = $this->mod_statistics->get_pathnames_for_class($classid);
 
-            $this->load->helper('form');
-            $this->load->library('form_validation');
-
-            $this->form_validation->set_rules('start_date', 'Start date', 'trim|callback_valid_date_check');
-            $this->form_validation->set_rules('end_date', 'End date', 'trim|callback_valid_date_check');
-            $this->form_validation->set_rules('exercise', 'Exercise', 'required');
-
+            $this->form_validation->set_rules('start_date', 'Start date', 'trim|valid_date_check');
+            $this->form_validation->set_rules('end_date', 'End date', 'trim|valid_date_check');
+            $this->form_validation->set_rules('exercise', '', 'callback_always_true');  // Dummy rule. At least one rule is required
 
 			if ($this->form_validation->run()) {
-                $period_start = $this->decode_start_date($this->input->post('start_date'));
-                $period_end = $this->decode_end_date($this->input->post('end_date'));
+                $period_start = decode_start_date($this->input->get('start_date'));
+                $period_end = decode_end_date($this->input->get('end_date')) -1;  // -1 to turn exclusive time into inclusive
 
-                // If period is more than MAX_PERIOD, this is faked POST data. Adjust the end date.
-                $period_end = min($period_end, $period_start + self::MAX_PERIOD);
+                // If period is longer than MAX_PERIOD, adjust the end date.
+                $period_end = min($period_end, $period_start + MAX_PERIOD -1);
 
-                $ex = $this->input->post('exercise');
-
-                // Find all user IDs and template IDs that match the specified pathname
-                $users_and_templs = $this->mod_statistics->get_users_and_templ($ex);
-
-                $resall = array();
-                $real_students = array(); // Will be used as a set
-
-                foreach ($users_and_templs as $uid => $templs) {
-                    $res = $this->mod_statistics->get_score_by_date_user_templ($uid,$templs,$period_start,$period_end);
-                    if (empty($res))
-                        continue;
-                    $resall[] = $res;
-                    $real_students[$uid] = true;
+                $ex = $this->input->get('exercise');
+                if (empty($ex)) {
+                    $ex = '';
+                    $status = 2; // 2=Initial display
+                    $real_students = null;
+                    $resall = null;
                 }
+                else {
+                    // Find all user IDs and template IDs that match the specified pathname
+                    $users_and_templs = $this->mod_statistics->get_users_and_templ($ex);
 
-                $status = empty($resall) ? 0 : 1;  // 0=no data, 1=data
+                    $resall = array();
+                    $real_students = array(); // Will be used as a set
 
-                // Get student names
-                foreach ($real_students as $uid => &$v)
-                    $v = make_full_name($this->mod_users->get_user_by_id($uid));
+                    foreach ($users_and_templs as $uid => $templs) {
+                        $res = $this->mod_statistics->get_score_by_date_user_templ($uid,$templs,$period_start,$period_end);
+                        if (empty($res))
+                            continue;
+                        $resall[] = $res;
+                        $real_students[$uid] = true;
+                    }
 
-                // Because $users_and_temps is sorted by user ID, $real_students and $resall are sorted in the same order
+                    $status = empty($resall) ? 0 : 1;  // 0=no data, 1=data
+                    
+                    // Get student names
+                    foreach ($real_students as $uid => &$v)
+                        $v = make_full_name($this->mod_users->get_user_by_id($uid));
+
+                    // Because $users_and_temps is sorted by user ID, $real_students and $resall are sorted in the same order
+                }
             }
             else {
                 $period_end = ((int)(time() / (24*3600)) + 1) * 24*3600;  // Midnight tonight
-                $period_start = $period_end - self::MAX_PERIOD;
-                $ex = '';
+                $period_start = $period_end - MAX_PERIOD;
+                --$period_end;  // Turn exclusive time into inclusive
 
+                $ex = '';
                 $status = 2; // 2=Initial display
                 $real_students = null;
                 $resall = null;
             }
 
             // How many weeks does the time cover?
-            $minweek = $this->time_to_week($period_start);
-            $maxweek = $this->time_to_week($period_end-1);
+            $minweek = time_to_week($period_start);
+            $maxweek = time_to_week($period_end);
 
             
             // VIEW:
@@ -259,7 +259,8 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
                                                                     'RGraph/libraries/RGraph.scatter.js',
                                                                     'RGraph/libraries/RGraph.common.dynamic.js',
                                                                     'RGraph/libraries/RGraph.common.tooltips.js',
-                                                                    'RGraph/libraries/RGraph.common.key.js')));
+                                                                    'RGraph/libraries/RGraph.common.key.js',
+                                                                    'myapp/third_party/lj/js/datepicker_period.js')));
 
             $this->load->view('view_top2');
             $this->load->view('view_menu_bar', array('langselect' => true));
@@ -270,8 +271,8 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
                                                                                    'resall' => $resall,
                                                                                    'status' => $status,
                                                                                    'quiz' => $ex,
-                                                                                   'start_date' => date('Y-m-d',$period_start),
-                                                                                   'end_date' => date('Y-m-d',$period_end),
+                                                                                   'start_date' => timestamp_to_date($period_start),
+                                                                                   'end_date' => timestamp_to_date($period_end),
                                                                                    'minweek' => (int)$minweek,
                                                                                    'maxweek' => (int)$maxweek,
                                                                                    'exercise_list' => $exercise_list), true);

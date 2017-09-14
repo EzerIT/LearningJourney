@@ -19,16 +19,18 @@
 ?>
    <h1>Statistics for exercise &ldquo;<?= htmlspecialchars($quiz) ?>&rdquo;</h1>
 
-  <?= form_open("/lj/LJ_graph_student/view_quiz") ?>
+   <?= form_open("/lj/LJ_graph_student/view_quiz",array('method'=>'get')) ?>
     <p>Specify date period (in the UTC time zone):</p>
-  <table>
-    <tr>
-    <td style="font-weight:bold;padding-right:5px;padding-left:20px;">From:</td><td style="padding-left:5px"><input type="text" name="start_date" value="<?= set_value('start_date',$start_date) ?>"></td>
-    </tr>
-    <tr>
-    <td style="font-weight:bold;padding-right:5px;padding-left:20px;">To (and including):</td><td style="padding-left:5px"><input type="text" name="end_date" value="<?= set_value('end_date',$end_date) ?>"></td>
-    </tr>
-  </table>
+    <table>
+      <tr>
+        <td style="font-weight:bold;padding-right:5px;padding-left:20px;">From:</td>
+        <td style="padding-left:5px"><input type="text" name="start_date" value="<?= $start_date ?>"></td>
+      </tr>
+      <tr>
+        <td style="font-weight:bold;padding-right:5px;padding-left:20px;">To (and including):</td>
+        <td style="padding-left:5px"><input type="text" name="end_date" value="<?= $end_date ?>"></td>
+      </tr>
+    </table>
 
   <input type="hidden" name="templ" value="<?= $quiz ?>">
   <input type="hidden" name="userid" value="<?= $userid ?>">
@@ -36,50 +38,9 @@
   <p><input class="btn btn-primary" style="margin-top:10px;" type="submit" name="submit" value="<?= $this->lang->line('OK_button') ?>"></p>
 </form>
 
-<script>
-    // ============== Datepicker ==============
-    $(function() {
-        var dateFormat = 'yy-mm-dd';
-        var start_date = $('input[name="start_date"]')
-            .datepicker({
-                dateFormat: dateFormat,
-                showWeek: true,
-                firstDay: 1,
-                numberOfMonths: 3
-            });
-        var end_date = $('input[name="end_date"]')
-            .datepicker({
-                dateFormat: dateFormat,
-                showWeek: true,
-                firstDay: 1,
-                numberOfMonths: 3
-            });
-
-        start_date
-            .on('change', function() {
-                var period_start = getDate(this);
-                // The period will be at most 26 weeks
-                var period_end = new Date(period_start.getFullYear(), period_start.getMonth(), period_start.getDate()+26*7);
-                end_date
-                    .datepicker('option', 'minDate', period_start)
-                    .datepicker('option', 'maxDate', period_end);
-            })
-            .trigger("change"); // Set initial minDate and maxDate in end_date
-
-        function getDate(element) {
-            var date;
-            try {
-                date = $.datepicker.parseDate(dateFormat, element.value);
-            }
-            catch (error) {
-                date = null;
-            }
-
-            return date;
-        }
-    });
-    // ============== End Datepicker ==============
-</script>
+  <script>
+        $(lj_datepicker_period('input[name="start_date"]','input[name="end_date"]'));
+  </script>
 
 <?php if ($status!=2): ?>
 
