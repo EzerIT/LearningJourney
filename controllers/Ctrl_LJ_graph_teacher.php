@@ -45,7 +45,7 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
         }
     }
 
-    public function view_students() {
+    public function student_time() {
     	$this->load->model('mod_users');
     	$this->load->model('mod_classes');
     	$this->load->model('mod_userclass');
@@ -145,14 +145,14 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
             $this->load->view('view_top2');
             $this->load->view('view_menu_bar', array('langselect' => true));
 
-            $center_text = $this->load->view('view_LJ_graph_view_students', array('status' => $status,
-                                                                                  'classid' => $classid,
-                                                                                  'classname' => $class->classname,
-                                                                                  'students' => $real_students,
-                                                                                  'start_date' => $this->lj_timeperiod->start_string(),
-                                                                                  'end_date' => $this->lj_timeperiod->end_string(),
-                                                                                  'dur' => $dur,
-                                                                                  'total' => $total), true);
+            $center_text = $this->load->view('view_LJ_teacher_time', array('status' => $status,
+                                                                           'classid' => $classid,
+                                                                           'classname' => $class->classname,
+                                                                           'students' => $real_students,
+                                                                           'start_date' => $this->lj_timeperiod->start_string(),
+                                                                           'end_date' => $this->lj_timeperiod->end_string(),
+                                                                           'dur' => $dur,
+                                                                           'total' => $total), true);
 
             $this->load->view('view_main_page', array('left_title' => 'Select a Period',
                                                       'left' => '<p>Use the two date fields to select a first
@@ -180,6 +180,7 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
 
             $this->load->helper('form');
             $this->load->library('form_validation');
+            $this->load->library('db_config');
 
             $this->form_validation->set_data($_GET);
 
@@ -209,6 +210,7 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
                     $users_and_templs = $this->mod_statistics->get_users_and_templ($ex);
 
                     $resall = array();
+                    $resfeatall = array();
                     $real_students = array(); // Will be used as a set
 
                     foreach ($users_and_templs as $uid => $templs) {
@@ -216,13 +218,31 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
                                                                                    $templs,
                                                                                    $this->lj_timeperiod->start_timestamp(),
                                                                                    $this->lj_timeperiod->end_timestamp());
+
+                        $resfeat = $this->mod_statistics->get_features_by_date_user_templ($uid,
+                                                                                  $templs,
+                                                                                  $this->lj_timeperiod->start_timestamp(),
+                                                                                  $this->lj_timeperiod->end_timestamp());
+
                         if (empty($res))
                             continue;
                         $resall[] = $res;
+                        $resfeatall[] = $resfeat;
                         $real_students[$uid] = true;
                     }
 
                     $status = empty($resall) ? 0 : 1;  // 0=no data, 1=data
+
+                    // Localize feature names
+                    if (!empty($resfeatall)) {
+                        // We assume that the underlying database information never changed
+                        $dbnames = $this->mod_statistics->get_templ_db($templs);
+                        $this->db_config->init_config($dbnames->dbname,$dbnames->dbpropname, $this->language_short);
+                        $l10n = json_decode($this->db_config->l10n_json);
+                        $featloc = $l10n->emdrosobject->{$dbnames->qoname}; // We only need localization of feature names
+                    }
+                    else
+                        $featloc = null;
                     
                     // Get student names
                     foreach ($real_students as $uid => &$v)
@@ -238,6 +258,8 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
                 $status = 2; // 2=Initial display
                 $real_students = null;
                 $resall = null;
+                $resfeatall = null;
+                $featloc = null;
             }
 
             // How many weeks does the time cover?
@@ -249,6 +271,7 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
             $this->load->view('view_top1', array('title' => 'Exercise Graphs',
                                                  'js_list' => array('RGraph/libraries/RGraph.common.core.js',
                                                                     'RGraph/libraries/RGraph.scatter.js',
+                                                                    'RGraph/libraries/RGraph.hbar.js',
                                                                     'RGraph/libraries/RGraph.common.dynamic.js',
                                                                     'RGraph/libraries/RGraph.common.tooltips.js',
                                                                     'RGraph/libraries/RGraph.common.key.js',
@@ -257,17 +280,19 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
             $this->load->view('view_top2');
             $this->load->view('view_menu_bar', array('langselect' => true));
             
-            $center_text = $this->load->view('view_LJ_graph_view_exercises', array('classid' => $classid,
-                                                                                   'classname' => $class->classname,
-                                                                                   'students' => $real_students,
-                                                                                   'resall' => $resall,
-                                                                                   'status' => $status,
-                                                                                   'quiz' => $ex,
-                                                                                   'start_date' => $this->lj_timeperiod->start_string(),
-                                                                                   'end_date' => $this->lj_timeperiod->end_string(),
-                                                                                   'minweek' => $this->lj_timeperiod->start_week(),
-                                                                                   'maxweek' => $this->lj_timeperiod->end_week(),
-                                                                                   'exercise_list' => $exercise_list), true);
+            $center_text = $this->load->view('view_LJ_teacher_exercises', array('classid' => $classid,
+                                                                                'classname' => $class->classname,
+                                                                                'students' => $real_students,
+                                                                                'resscoreall' => $resall,
+                                                                                'resfeatall' => $resfeatall,
+                                                                                'featloc' => $featloc,
+                                                                                'status' => $status,
+                                                                                'quiz' => $ex,
+                                                                                'start_date' => $this->lj_timeperiod->start_string(),
+                                                                                'end_date' => $this->lj_timeperiod->end_string(),
+                                                                                'minweek' => $this->lj_timeperiod->start_week(),
+                                                                                'maxweek' => $this->lj_timeperiod->end_week(),
+                                                                                'exercise_list' => $exercise_list), true);
 
             $this->load->view('view_main_page', array('left_title' => 'Select a Period',
                                                       'left' => '<p>Use the two date fields to select a first

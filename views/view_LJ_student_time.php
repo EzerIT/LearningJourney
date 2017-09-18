@@ -2,23 +2,11 @@
     $valerr = validation_errors();
     if (!empty($valerr))
         echo "<div class=\"alert alert-danger\">$valerr</div>\n";
-     
-    function format_week(integer $weekno) {
-        // $week is number of weeks since 1970-01-05
-        $monday_offset = 4*24*3600;
-        $seconds_per_week = 7*24*3600;
-     
-        $unixtime = $weekno * $seconds_per_week + $monday_offset;
-     
-        // $dt = date('oW',$unixtime);
-        // $year = substr($dt,2,2);
-        // $week = substr($dt,4);
-        
-        return date('W',$unixtime);
-    }
 ?>
 
 <?= form_open("lj/LJ_graph_student/student_time",array('method'=>'get')) ?>
+    <input type="hidden" name="userid" value="<?= $userid ?>">
+        
     <p>Specify date period (in the UTC time zone):</p>
     <table>
       <tr>
@@ -55,7 +43,8 @@
 <?php else: ?>
   <h1>Statistics for class &ldquo;<?= htmlspecialchars($myclassname) ?>&rdquo;</h1>
 <?php endif; ?>
-  
+  <h1>Student is <?= htmlspecialchars($this->mod_users->user_name($userid)) ?></h1>
+        
 <?php $totaltime = array_sum($total); ?>
 <?php if ($totaltime==0): ?>
     <h2>No data</h2>
@@ -79,7 +68,7 @@
 
       foreach ($totaltemp as $name => $value) {
           $totaltempnames_html[] = "'" . htmlspecialchars($name) . "'";
-          $totaltempnames_url[] = "'" . build_get('/lj/LJ_graph_student/view_quiz',
+          $totaltempnames_url[] = "'" . build_get('/lj/LJ_graph_student/view_exercise',
                                                   array('templ' => $name,
                                                         'start_date' => $start_date,
                                                         'end_date' => $end_date,
@@ -131,7 +120,7 @@
             id: 'weekcanvas',
             data: [<?= implode(",", $total) ?>],
             options: {
-                labels: [<?php foreach ($total as $w => $ignore) echo '"',format_week($w),'",'; ?>],
+                labels: [<?php foreach ($total as $w => $ignore) echo '"',Lj_timeperiod::format_week($w),'",'; ?>],
                 colors: ['#f00'],
                 gutterLeft: 55,
                 gutterBottom: 45,
@@ -151,6 +140,7 @@
                 labels: [<?= implode(",", $totaltempnames) ?>],
                 gutterLeftAutosize: true,
                 gutterBottom: 45,
+                vmargin: 5,
                 scaleZerostart: true,
                 titleXaxis: 'Minutes',                  
                 titleXaxisY: <?= $canvasheight-10 ?>,

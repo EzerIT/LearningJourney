@@ -23,6 +23,16 @@ class Lj_timeperiod {
         $this->CI =& get_instance();
     }
 
+    public static function format_week(integer $weekno) {
+        // $week is number of weeks since 1970-01-05
+        $monday_offset = 4*24*3600;
+        $seconds_per_week = 7*24*3600;
+
+        $unixtime = $weekno * $seconds_per_week + $monday_offset;
+
+        return date('W',$unixtime);
+    }
+    
     private function decode_start_date($date) {
         if (is_null($date))
             return ((int)(time() / (24*3600)) + 1) * 24*3600 /*Midnight tonight*/ - self::MAX_PERIOD;

@@ -10,7 +10,7 @@
     <tr>
       <td><?= $cl->classname ?></td>
       <td style="padding-left:5px;text-align:center;">
-       <a class="label label-primary" href="<?= site_url('lj/LJ_graph_teacher/view_students') ?>?classid=<?= $cl->id ?>">Students</a>
+       <a class="label label-primary" href="<?= site_url('lj/LJ_graph_teacher/student_time') ?>?classid=<?= $cl->id ?>">Students</a>
        <a class="label label-primary" href="<?= site_url('lj/LJ_graph_teacher/view_exercises') ?>?classid=<?= $cl->id ?>">Exercises</a>
      </td>
     </tr>

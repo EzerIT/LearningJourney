@@ -2,24 +2,9 @@
     $valerr = validation_errors();
     if (!empty($valerr))
         echo "<div class=\"alert alert-danger\">$valerr</div>\n";
-     
-    function format_week(integer $weekno) {
-        // $week is number of weeks since 1970-01-05
-        $monday_offset = 4*24*3600;
-        $seconds_per_week = 7*24*3600;
-     
-        $unixtime = $weekno * $seconds_per_week + $monday_offset;
-     
-        // $dt = date('oW',$unixtime);
-        // $year = substr($dt,2,2);
-        // $week = substr($dt,4);
-        
-        return date('W',$unixtime);
-    }
 ?>
 
-  <h1>Statistics for class &ldquo;<?= htmlspecialchars($classname) ?>&rdquo;</h1>
-  <?= form_open("lj/LJ_graph_teacher/view_students",array('method'=>'get')) ?>
+  <?= form_open("lj/LJ_graph_teacher/student_time",array('method'=>'get')) ?>
     <input type="hidden" name="classid" value="<?= $classid ?>">
 
     <p>Specify date period (in the UTC time zone):</p>
@@ -41,7 +26,9 @@
         $(lj_datepicker_period('input[name="start_date"]','input[name="end_date"]'));
   </script>
 
-<?php if ($status==1): ?>
+  <h1>Statistics for class &ldquo;<?= htmlspecialchars($classname) ?>&rdquo;</h1>
+
+  <?php if ($status==1): ?>
   <?php if (array_sum($total)==0): ?>
 
     <h2>No data</h2>
@@ -55,7 +42,13 @@
       $student_captions = array();
       $ix = 0;
       foreach ($students as $id => $name) {
-          $student_captions[$ix] = "'<input type=\"checkbox\" checked name=\"users\" value=\"$ix\">" . addslashes($name) . "'";
+          $student_captions[$ix] = "'<input type=\"checkbox\" checked name=\"users\" value=\"$ix\">"
+              . anchor(build_get('/lj/LJ_graph_student/student_time',
+                                 array('userid' => $id,
+                                       'start_date' => $start_date,
+                                       'end_date' => $end_date,
+                                       'classid' => $classid)), addslashes($name))
+              . "'";
           ++$ix;
       }
   ?>
@@ -120,7 +113,7 @@
             id: 'totalcanvas',
             data: [<?= implode(",", $total) ?>],
             options: {
-                labels: [<?php foreach ($total as $w => $ignore) echo '"',format_week($w),'",'; ?>],
+                labels: [<?php foreach ($total as $w => $ignore) echo '"',Lj_timeperiod::format_week($w),'",'; ?>],
                 colors: ['#f00'],
                 gutterLeft: 55,
                 gutterBottom: 45,
@@ -149,7 +142,7 @@
             id: 'studentscanvas',
             data: null,
             options: {
-                labels: [<?php foreach ($total as $w => $ignore) echo '"',format_week($w),'",'; ?>],
+                labels: [<?php foreach ($total as $w => $ignore) echo '"',Lj_timeperiod::format_week($w),'",'; ?>],
                 colors: null,
                 gutterLeft: 55,
                 gutterBottom: 45,
