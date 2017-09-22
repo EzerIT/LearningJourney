@@ -30,7 +30,7 @@
   </script>
 
   <h1>Statistics for exercise &ldquo;<?= htmlspecialchars($quiz) ?>&rdquo;</h1>
-  <h1>Student is <?= htmlspecialchars($this->mod_users->user_name($userid)) ?></h1>
+  <h1>Student is <?= htmlspecialchars($user_full_name) ?></h1>
 
   <h1>HUSK: Valg af med/uden grading</h1>
 
@@ -46,7 +46,7 @@
       $res = array();
       $resspf = array();
       foreach ($resscore as $date => $r) {
-          $res[]    = "['$date',{$r['percentage']},null,'Date: $date<br>Questions: {$r['count']}']";
+          $res[]    = "['$date',{$r['percentage']},null,'Date: $date<br>Questions: {$r['count']}<br>Per min.: " . round($r['featpermin'],1) . "']";
           $roundpct = round($r['percentage']);
           $resspf[] = "['$date',{$r['featpermin']},null,'Date: $date<br>Correct: $roundpct%']";
       }
@@ -166,7 +166,7 @@
 
           var hbarconf = {
             id: 'featcanvas',
-              data: [<?= implode(",", $featpct) ?>],
+            data: [<?= implode(",", $featpct) ?>],
             options: {
                 labels: [<?= implode(",", $featname) ?>],
                 gutterLeftAutosize: true,

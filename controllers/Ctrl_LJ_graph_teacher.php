@@ -204,6 +204,8 @@ class Ctrl_LJ_graph_teacher extends MY_Controller {
                     $status = 2; // 2=Initial display
                     $real_students = null;
                     $resall = null;
+                    $resfeatall = null;
+                    $featloc = null;
                 }
                 else {
                     // Find all user IDs and template IDs that match the specified pathname

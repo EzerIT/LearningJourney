@@ -17,9 +17,7 @@ function lj_menu_add(&$head, &$content) {
     
     $content[$ix][] = anchor(site_url('/lj/LJ_gradebook_teacher'), $CI->lang->line('gradebook'));
 
-    $content[$ix][] = anchor(site_url('/lj/LJ_graph_student/student_time'), translate('My time'));
-    $content[$ix][] = anchor(site_url('/lj/LJ_graph_student/student_exercises'), translate('My exercises'));
-    $content[$ix][] = anchor(site_url('/lj/LJ_graph_student/student_questions'), translate('My questions'));
+    $content[$ix][] = anchor(site_url('/lj/LJ_graph_student/student_time'), translate('My data'));
 
     if ($CI->Mod_users->is_teacher())
         $content[$ix][] = anchor(site_url('/lj/LJ_graph_teacher'), translate('My students'));

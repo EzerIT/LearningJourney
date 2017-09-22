@@ -104,7 +104,8 @@ class Ctrl_LJ_graph_student extends MY_Controller {
                 else
                     $totaltemp[$templname] += $hours;
             }
-
+            
+            $user_full_name = $this->mod_users->user_full_name($userid);
             
             // VIEW:
             $this->load->view('view_top1', array('title' => 'Student Graphs',
@@ -121,6 +122,7 @@ class Ctrl_LJ_graph_student extends MY_Controller {
             $center_text = $this->load->view('view_LJ_student_time', array('classid' => $classid,
                                                                            'classlist' => $myclasses,
                                                                            'userid' => $userid,
+                                                                           'user_full_name' => $user_full_name,
                                                                            'start_date' => $this->lj_timeperiod->start_string(),
                                                                            'end_date' => $this->lj_timeperiod->end_string(),
                                                                            'total' => $total,
@@ -209,6 +211,8 @@ class Ctrl_LJ_graph_student extends MY_Controller {
                 $status = 2; // 2=Bad data
             }
 
+            $user_full_name = $this->mod_users->user_full_name($userid);
+            
             // VIEW:
             $this->load->view('view_top1', array('title' => 'Exercise Graphs',
                                                  'js_list' => array('RGraph/libraries/RGraph.common.core.js',
@@ -228,6 +232,7 @@ class Ctrl_LJ_graph_student extends MY_Controller {
                                                                                 'quiz' => $templ,
                                                                                 'status' => $status,
                                                                                 'userid' => $userid,
+                                                                                'user_full_name' => $user_full_name,
                                                                                 'start_date' => $this->lj_timeperiod->start_string(),
                                                                                 'end_date' => $this->lj_timeperiod->end_string(),
                                                                                 'minweek' => $this->lj_timeperiod->start_week(),

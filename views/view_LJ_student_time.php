@@ -43,7 +43,7 @@
 <?php else: ?>
   <h1>Statistics for class &ldquo;<?= htmlspecialchars($myclassname) ?>&rdquo;</h1>
 <?php endif; ?>
-  <h1>Student is <?= htmlspecialchars($this->mod_users->user_name($userid)) ?></h1>
+  <h1>Student is <?= htmlspecialchars($user_full_name) ?></h1>
         
 <?php $totaltime = array_sum($total); ?>
 <?php if ($totaltime==0): ?>
